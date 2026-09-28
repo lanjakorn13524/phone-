@@ -1,0 +1,26 @@
+{
+  "name": "control-plane",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @cp/admin-web",
+    "build": "npm run build -w @cp/admin-web",
+    "deploy:web": "npm run build -w @cp/admin-web && npx wrangler pages deploy apps/admin-web/dist --project-name control-plane",
+    "typecheck": "tsc -p tsconfig.check.json && npm run typecheck -w @cp/admin-web",
+    "supabase:start": "supabase start",
+    "supabase:link": "supabase link --project-ref $SUPABASE_PROJECT_REF",
+    "supabase:push": "supabase db push",
+    "supabase:seed": "supabase db reset",
+    "functions:deploy": "supabase functions deploy connectors-firestore sync-member-stats backup-upload"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

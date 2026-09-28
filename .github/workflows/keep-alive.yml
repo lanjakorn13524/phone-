@@ -1,0 +1,33 @@
+name: keep-alive
+
+# Supabase Free จะ pause โปรเจกต์ที่ไม่มี activity 7 วัน
+# งานนี้ยิง DB ทุก 12 ชม. เพื่อไม่ให้โดน pause (ฟรี: private repo ได้ 2,000 นาที/เดือน ใช้ไม่ถึง 60 นาที)
+# พร้อมกันเป็น smoke test ว่าระบบยังตอบอยู่ — ถ้า fail จะเตือนทาง email
+
+on:
+  schedule:
+    - cron: '17 */12 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ตรวจว่า DB ตอบอยู่
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/rpc/health_ping")
+          echo "HTTP $code"
+          cat /tmp/health.json
+          [ "$code" = "200" ] || { echo "::error::health check ไม่ผ่าน (HTTP $code)"; exit 1; }

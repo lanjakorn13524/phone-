@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+.DS_Store
+*.log
+
+# supabase
+supabase/.temp/
+supabase/.branches/
+supabase/functions/.env
+
+# backups (never commit dumps)
+backups/
+*.sql
+*.sql.gz

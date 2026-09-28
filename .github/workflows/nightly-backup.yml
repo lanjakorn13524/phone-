@@ -1,0 +1,60 @@
+name: nightly-backup
+
+# pg_dump รายวัน 03:00 (หลังที่ sync-member-stats เสร็จ) -> ส่งเข้า Edge Function -> Supabase Storage
+# เหตุผลที่ไม่รันใน pg_cron: pg_dump เป็น client binary รันใน Postgres ไม่ได้
+# service_role key ไม่ต้องอยู่ใน CI — ใช้ BACKUP_UPLOAD_TOKEN แทน
+
+on:
+  schedule:
+    - cron: '11 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ติดตั้ง psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql --version
+
+      - name: pg_dump (custom format + gzip)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          file="cp-$(date -u +%Y-%m-%d).sql.gz"
+          # -Fc = custom format เข้า/ออกเร็วและเลือกตารางย่อยยอมได้ตอนกู้
+          pg_dump --format=custom --no-owner --no-privileges --dbname="$DATABASE_URL" \
+            | gzip -9 > "out/$file"
+          ls -lh "out/$file"
+          echo "FILENAME=$file" >> "$GITHUB_ENV"
+
+      - name: ตรวจว่าไฟล์เปิดได้จริง (backup ที่ไม่เคย restore ไม่ใช่ backup)
+        run: |
+          set -euo pipefail
+          gunzip -t "out/$FILENAME" && echo "gzip ok"
+          zcat "out/$FILENAME" | head -c 200 | strings | head -5
+
+      - name: ส่งเข้า Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          BACKUP_UPLOAD_TOKEN: ${{ secrets.BACKUP_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/resp.json -w '%{http_code}' \
+            -X POST "$SUPABASE_URL/functions/v1/backup-upload" \
+            -H "x-backup-token: $BACKUP_UPLOAD_TOKEN" \
+            -H "x-filename: $FILENAME" \
+            -H "Content-Type: application/gzip" \
+            --data-binary "@out/$FILENAME")
+          echo "HTTP $code"
+          cat /tmp/resp.json
+          [ "$code" = "200" ] || { echo "::error::อัปโหลด backup ไม่สำเร็จ"; exit 1; }
