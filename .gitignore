@@ -16,8 +16,13 @@ build/
 supabase/.temp/
 supabase/.branches/
 supabase/functions/.env
+# มี secret จริงอยู่ในไฟล์นี้
+supabase/bootstrap.local.sql
 
 # backups (never commit dumps)
 backups/
-*.sql
 *.sql.gz
+*.dump
+
+# หมายเหตุ: migration/seed ของ Supabase ต้อง track ใน git
+# (เคยเป็นบรรทัด `*.sql` ทำให้ supabase/migrations/*.sql ไม่ถูก commit เลย)

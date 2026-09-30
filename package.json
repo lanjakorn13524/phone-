@@ -14,8 +14,9 @@
     "supabase:start": "supabase start",
     "supabase:link": "supabase link --project-ref $SUPABASE_PROJECT_REF",
     "supabase:push": "supabase db push",
+    "setup:prod": "node scripts/setup-prod.mjs",
     "supabase:seed": "supabase db reset",
-    "functions:deploy": "supabase functions deploy connectors-firestore sync-member-stats backup-upload"
+    "functions:deploy": "supabase functions deploy connectors-firestore sync-member-stats backup-upload check-sites"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

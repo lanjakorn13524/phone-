@@ -21,6 +21,20 @@ type DecodedShape =
 
 const API = 'https://firestore.googleapis.com/v1';
 
+/** Firestore ใช้ชื่อ operator แบบ enum — แปลงจากสัญลักษณ์ที่อ่านง่ายในโค้ดเรา */
+const FIRESTORE_OPS: Record<string, string> = {
+  '==': 'EQUAL',
+  '=': 'EQUAL',
+  '!=': 'NOT_EQUAL',
+  '>': 'GREATER_THAN',
+  '>=': 'GREATER_THAN_OR_EQUAL',
+  '<': 'LESS_THAN',
+  '<=': 'LESS_THAN_OR_EQUAL',
+  in: 'IN',
+  'not-in': 'NOT_IN',
+  'array-contains': 'ARRAY_CONTAINS',
+};
+
 function encodeScalar(value: unknown): FirestoreValue {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === 'string') return { stringValue: value };
@@ -153,26 +167,30 @@ export class FirestoreRest {
     collection: string,
     where?: { field: string; op: string; value: unknown },
   ): Promise<number> {
-    const body: Record<string, unknown> = {
-      collectionId: collection,
-      aggregationQuery: {
-        aggregations: [{ alias: 'all', count: {} }],
-      },
-    };
+    const structuredQuery: Record<string, unknown> = { from: [{ collectionId: collection }] };
     if (where) {
-      (body.aggregationQuery as Record<string, unknown>).where = {
+      structuredQuery.where = {
         fieldFilter: {
           field: { fieldPath: where.field },
-          op: where.op,
+          op: FIRESTORE_OPS[where.op] ?? where.op.toUpperCase(),
           value: encodeValue(where.value),
         },
       };
     }
-    const res = await this.request<{ result?: { aggregateFields?: Record<string, { integerValue?: string }> } }>(
-      ':runAggregationQuery',
-      { method: 'POST', body: JSON.stringify(body) },
-    );
-    const raw = res.result?.aggregateFields?.all?.integerValue;
+
+    const res = await this.request<
+      Array<{ result?: { aggregateFields?: Record<string, { integerValue?: string }> } }>
+    >(':runAggregationQuery', {
+      method: 'POST',
+      body: JSON.stringify({
+        structuredAggregationQuery: {
+          aggregations: [{ alias: 'all', count: {} }],
+          structuredQuery,
+        },
+      }),
+    });
+
+    const raw = res[0]?.result?.aggregateFields?.all?.integerValue;
     return raw ? Number(raw) : 0;
   }
 

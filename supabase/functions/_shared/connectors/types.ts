@@ -6,6 +6,7 @@ export interface ServiceAccountKey {
   project_id: string;
   client_email: string;
   private_key: string; // มี \n จริงในค่า
+  token_uri?: string; // จากไฟล์ JSON ของ Firebase — ถ้าไม่มีใช้ค่า default
 }
 
 export interface FirestoreSiteConfig extends ServiceAccountKey {

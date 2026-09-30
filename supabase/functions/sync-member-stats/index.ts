@@ -33,7 +33,13 @@ Deno.serve(async (req) => {
         }).countMembers();
 
         const { error: upErr } = await db.from('site_member_stats').upsert(
-          { site_id: site.id, ...stats, captured_at: new Date().toISOString() },
+          {
+            site_id: site.id,
+            total: stats.total,
+            active: stats.active,
+            new_this_month: stats.newThisMonth,
+            captured_at: new Date().toISOString(),
+          },
           { onConflict: 'site_id' },
         );
         if (upErr) throw new Error(upErr.message);
