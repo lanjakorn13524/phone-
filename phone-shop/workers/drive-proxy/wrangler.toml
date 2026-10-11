@@ -1,0 +1,7 @@
+name = "phone-shop-drive-proxy"
+main = "src/worker.ts"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "IMAGES"
+id = "71d4301df33f46f5b1552c3e0880a880"
