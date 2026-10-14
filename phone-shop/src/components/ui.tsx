@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useImageUrl } from '../lib/images'
 
 export const inputClass =
-  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
 
 export const labelClass = 'mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300'
 

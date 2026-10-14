@@ -4,12 +4,13 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  getFirestore,
+  initializeFirestore,
+  onSnapshot,
   setDoc,
   writeBatch,
   type Firestore,
 } from 'firebase/firestore'
-import type { Backend, Device, Employee, GlobalAccount, Sale, Shop } from './types'
+import type { Backend, Device, Employee, GlobalAccount, Sale, Shop, Snapshot } from './types'
 
 export function firebaseConfig() {
   return {
@@ -28,7 +29,7 @@ export function isFirebaseConfigured(): boolean {
 
 function getDb(): Firestore {
   const app: FirebaseApp = getApps()[0] ?? initializeApp(firebaseConfig())
-  return getFirestore(app)
+  return initializeFirestore(app, { ignoreUndefinedProperties: true })
 }
 
 export function createFirestoreBackend(): Backend {
@@ -50,6 +51,25 @@ export function createFirestoreBackend(): Backend {
         loadAll<Sale>('sales'),
       ])
       return { shops, employees, accounts, devices, sales }
+    },
+    subscribe(onData, onError) {
+      const names: (keyof Snapshot)[] = ['shops', 'employees', 'accounts', 'devices', 'sales']
+      const parts: Snapshot = { shops: [], employees: [], accounts: [], devices: [], sales: [] }
+      const seen = new Set<keyof Snapshot>()
+      const unsubs = names.map((name) =>
+        onSnapshot(
+          collection(db, name),
+          (snap) => {
+            const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }))
+            const target = parts as unknown as Record<string, unknown[]>
+            target[name] = rows
+            seen.add(name)
+            if (seen.size === names.length) onData(parts)
+          },
+          (err) => onError?.(err),
+        ),
+      )
+      return () => unsubs.forEach((unsub) => unsub())
     },
     async upsertDevice(device) {
       await setDoc(doc(db, 'devices', device.id), { ...device, id: device.id })

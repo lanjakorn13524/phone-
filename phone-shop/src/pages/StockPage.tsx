@@ -1,32 +1,46 @@
 import { useMemo, useState } from 'react'
 import { DeviceDetailModal } from '../components/DeviceDetailModal'
 import { SellModal } from '../components/SellModal'
-import { BoxIcon, PencilIcon, SearchIcon } from '../components/icons'
-import { btnGhost, btnPrimary, cardClass, inputClass, Lightbox, Thumb } from '../components/ui'
+import { BoxIcon, PencilIcon, SearchIcon, TrashIcon } from '../components/icons'
+import { btnDanger, btnGhost, btnPrimary, cardClass, inputClass } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { useBackend } from '../lib/backend'
 import { baht } from '../lib/format'
 import type { Device } from '../lib/types'
 
 export function StockPage() {
-  const { activeShop, isStaff, isAdmin } = useAuth()
-  const { snapshot } = useBackend()
+  const { activeShop, isStaff, isAdmin, isOwner, session } = useAuth()
+  const { snapshot, deleteDevice } = useBackend()
   const [query, setQuery] = useState('')
   const [shopFilter, setShopFilter] = useState('')
   const [selling, setSelling] = useState<Device | null>(null)
   const [detail, setDetail] = useState<{ device: Device; readOnly: boolean } | null>(null)
-  const [viewer, setViewer] = useState<{ refs: string[]; index: number } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Get owner's shop IDs for filtering
+  const ownerShopIds = isOwner
+    ? snapshot.shops.filter((s) => s.ownerId === session?.id).map((s) => s.id)
+    : []
 
   const devices = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return snapshot.devices
-      .filter((d) => (isStaff ? d.shopId === activeShop?.id : shopFilter ? d.shopId === shopFilter : true))
+    let filtered = snapshot.devices
+
+    // Filter by owner's shops for owner role
+    if (isOwner) {
+      filtered = filtered.filter((d) => ownerShopIds.includes(d.shopId))
+    } else if (isStaff) {
+      filtered = filtered.filter((d) => d.shopId === activeShop?.id)
+    } else if (shopFilter) {
+      filtered = filtered.filter((d) => d.shopId === shopFilter)
+    }
+
+    return filtered
       .filter((d) =>
         q ? [d.model, d.imei, d.color, d.memory].some((v) => v.toLowerCase().includes(q)) : true,
       )
       .sort((a, b) => b.createdAt - a.createdAt)
-  }, [snapshot.devices, isStaff, activeShop?.id, shopFilter, query])
+  }, [snapshot.devices, isStaff, isOwner, activeShop?.id, shopFilter, query, ownerShopIds, session?.id])
 
   const totalValue = devices.reduce((sum, d) => sum + d.sellPrice, 0)
 
@@ -34,11 +48,15 @@ export function StockPage() {
     return snapshot.shops.find((s) => s.id === shopId)?.name ?? 'ร้าน'
   }
 
-  function openViewer(device: Device, index: number) {
-    const refs = [...device.images.device]
-    if (device.images.idCard) refs.push(device.images.idCard)
-    if (refs.length === 0) return
-    setViewer({ refs, index })
+  function openDetail(device: Device) {
+    setDetail({ device, readOnly: !isAdmin })
+  }
+
+  async function handleDeleteDevice(device: Device) {
+    if (!window.confirm(`ลบเครื่อง "${device.model}" (IMEI: ${device.imei}) ออกจากสต็อก?`)) return
+    await deleteDevice(device.id)
+    setToast(`ลบ ${device.model} แล้ว`)
+    window.setTimeout(() => setToast(null), 2500)
   }
 
   return (
@@ -78,7 +96,10 @@ export function StockPage() {
           >
             ทุกร้าน
           </button>
-          {snapshot.shops.map((s) => (
+          {(isOwner
+            ? snapshot.shops.filter((s) => s.ownerId === session?.id)
+            : snapshot.shops
+          ).map((s) => (
             <button
               key={s.id}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
@@ -102,43 +123,57 @@ export function StockPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {devices.map((d) => (
             <div key={d.id} className={`${cardClass} overflow-hidden`}>
-              <Thumb
-                imageRef={d.images.device[0]}
-                alt={d.model}
-                className="aspect-square w-full"
-                onClick={() => openViewer(d, 0)}
-              />
-              <div className="space-y-2 p-3">
-                <div>
-                  <p className="truncate text-sm font-semibold">{d.model}</p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {d.color} · {d.memory}
-                  </p>
-                  {!isStaff ? (
-                    <p className="truncate text-[11px] text-brand-600 dark:text-brand-400">
-                      {shopName(d.shopId)}
+              <div className="cursor-pointer" onClick={() => openDetail(d)}>
+                <div className="space-y-2 px-3 pt-3">
+                  <div>
+                    <p className="truncate text-sm font-semibold">{d.model}</p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {d.color} · {d.memory}
                     </p>
-                  ) : null}
+                    {!isStaff ? (
+                      <p className="truncate text-[11px] text-brand-600 dark:text-brand-400">
+                        {shopName(d.shopId)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                    {d.checklist?.answers.model ? (
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                        โมเดล {d.checklist.answers.model}
+                      </span>
+                    ) : null}
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                      แบต {d.battery}
+                    </span>
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                      ทุน {baht(d.costPrice)}
+                    </span>
+                  </div>
+                  <p className="text-base font-bold text-brand-600 dark:text-brand-400">
+                    {baht(d.sellPrice)}
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-1 text-[10px] text-slate-500 dark:text-slate-400">
-                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                    แบต {d.battery}
-                  </span>
-                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                    ทุน {baht(d.costPrice)}
-                  </span>
-                </div>
-                <p className="text-base font-bold text-brand-600 dark:text-brand-400">
-                  {baht(d.sellPrice)}
-                </p>
+              </div>
+              <div className="px-3 pb-3 pt-3">
                 {isStaff ? (
                   <button className={`${btnPrimary} w-full py-2 text-xs`} onClick={() => setSelling(d)}>
                     ขาย
                   </button>
-                ) : isAdmin ? (
-                  <button className={`${btnGhost} w-full py-2 text-xs`} onClick={() => setDetail({ device: d, readOnly: false })}>
-                    <PencilIcon className="h-3.5 w-3.5" /> แก้ไข
-                  </button>
+                ) : isAdmin || isOwner ? (
+                  <div className="flex gap-2">
+                    <button className={`${btnPrimary} flex-1 py-2 text-xs`} onClick={() => setSelling(d)}>
+                      ขาย
+                    </button>
+                    <button className={`${btnGhost} flex-1 py-2 text-xs`} onClick={() => setDetail({ device: d, readOnly: false })}>
+                      <PencilIcon className="h-3.5 w-3.5" /> แก้ไข
+                    </button>
+                    <button
+                      className={`${btnDanger} flex-1 py-2 text-xs`}
+                      onClick={() => handleDeleteDevice(d)}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" /> ลบ
+                    </button>
+                  </div>
                 ) : (
                   <button className={`${btnGhost} w-full py-2 text-xs`} onClick={() => setDetail({ device: d, readOnly: true })}>
                     ดูรายละเอียด
@@ -164,10 +199,6 @@ export function StockPage() {
 
       {detail ? (
         <DeviceDetailModal device={detail.device} readOnly={detail.readOnly} onClose={() => setDetail(null)} />
-      ) : null}
-
-      {viewer ? (
-        <Lightbox refs={viewer.refs} startIndex={viewer.index} onClose={() => setViewer(null)} />
       ) : null}
 
       {toast ? (

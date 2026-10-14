@@ -2,9 +2,67 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Stock มือถือ" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Stock มือถือ</title>
+    <script>
+      (function () {
+        function updateIosGap() {
+          var standalone =
+            window.navigator.standalone === true ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+          var gap = 0
+          if (standalone && window.screen) {
+            gap = Math.max(0, window.screen.height - window.innerHeight)
+          }
+          document.documentElement.style.setProperty('--ios-bottom-gap', gap + 'px')
+        }
+        updateIosGap()
+        window.addEventListener('resize', updateIosGap)
+        window.addEventListener('orientationchange', updateIosGap)
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', updateIosGap)
+        }
+
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () {})
+          })
+        }
+
+        var ua = navigator.userAgent || ''
+        var isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua) ||
+          ((navigator.maxTouchPoints || 0) > 1 && /Macintosh/.test(ua))
+        if (!isMobile) return
+
+        function block(event) {
+          event.preventDefault()
+        }
+
+        document.addEventListener('gesturestart', block, { passive: false })
+        document.addEventListener('gesturechange', block, { passive: false })
+        document.addEventListener('gestureend', block, { passive: false })
+        document.addEventListener(
+          'touchmove',
+          function (event) {
+            if (event.touches.length > 1) event.preventDefault()
+          },
+          { passive: false },
+        )
+        document.addEventListener('dblclick', block, { passive: false })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -9,9 +9,10 @@ import {
   currentMonthKey,
   dateKey,
   monthLabel,
-  monthRange,
   shortDayLabel,
   shiftMonth,
+  summaryDayOf,
+  summaryRange,
 } from '../lib/format'
 import type { Sale } from '../lib/types'
 
@@ -35,29 +36,40 @@ function sumSales(sales: Sale[]): Totals {
   )
 }
 
-function inMonth(sales: Sale[], month: string): Sale[] {
-  const { start, end } = monthRange(month)
-  return sales.filter((s) => s.soldAt >= start && s.soldAt < end)
+function salesInSummary(sales: Sale[], shopId: string, month: string, day: number): Sale[] {
+  const { start, end } = summaryRange(month, day)
+  return sales.filter((s) => s.shopId === shopId && s.soldAt >= start && s.soldAt < end)
+}
+
+function multiShopSales(sales: Sale[], shops: { id: string; summaryDay?: number }[], month: string): Sale[] {
+  return shops.flatMap((shop) => salesInSummary(sales, shop.id, month, summaryDayOf(shop)))
 }
 
 export function DashboardPage() {
-  const { activeShop, isStaff } = useAuth()
+  const { activeShop, isStaff, isOwner, session } = useAuth()
   if (isStaff) return <StaffDashboard shopId={activeShop?.id ?? ''} />
-  return <MultiShopDashboard />
+  return <MultiShopDashboard isOwner={isOwner} ownerId={session?.id} />
 }
 
 function StaffDashboard({ shopId }: { shopId: string }) {
   const { snapshot } = useBackend()
   const [month, setMonth] = useState(currentMonthKey())
-  const [compareMonth, setCompareMonth] = useState(shiftMonth(currentMonthKey(), -1))
+  const compareMonth = shiftMonth(month, -1)
 
-  const shopSales = useMemo(() => snapshot.sales.filter((s) => s.shopId === shopId), [snapshot.sales, shopId])
-  const monthSales = useMemo(() => inMonth(shopSales, month), [shopSales, month])
-  const compareSales = useMemo(() => inMonth(shopSales, compareMonth), [shopSales, compareMonth])
+  const shop = snapshot.shops.find((s) => s.id === shopId)
+  const summaryDay = summaryDayOf(shop)
+
+  const monthSales = useMemo(
+    () => salesInSummary(snapshot.sales, shopId, month, summaryDay),
+    [snapshot.sales, shopId, month, summaryDay],
+  )
+  const compareSales = useMemo(
+    () => salesInSummary(snapshot.sales, shopId, compareMonth, summaryDay),
+    [snapshot.sales, shopId, compareMonth, summaryDay],
+  )
   const totals = useMemo(() => sumSales(monthSales), [monthSales])
   const compareTotals = useMemo(() => sumSales(compareSales), [compareSales])
 
-  const shop = snapshot.shops.find((s) => s.id === shopId)
   const health = healthOf(totals.profit, compareTotals.profit)
 
   return (
@@ -87,39 +99,54 @@ function StaffDashboard({ shopId }: { shopId: string }) {
 
       <DailyChart sales={monthSales} />
 
-      <CompareCard
-        month={month}
-        compareMonth={compareMonth}
-        setCompareMonth={setCompareMonth}
-        a={totals}
-        b={compareTotals}
-      />
+      <CompareCard month={month} a={totals} b={compareTotals} title="เปรียบเทียบเดือน · ร้านนี้" />
 
-      <ValueBreakdown sales={shopSales} />
+      <ValueBreakdown getSales={(m) => salesInSummary(snapshot.sales, shopId, m, summaryDay)} />
     </div>
   )
 }
 
-function MultiShopDashboard() {
+function MultiShopDashboard({ isOwner, ownerId }: { isOwner: boolean; ownerId?: string }) {
   const { snapshot } = useBackend()
   const [month, setMonth] = useState(currentMonthKey())
-  const [compareMonth, setCompareMonth] = useState(shiftMonth(currentMonthKey(), -1))
+  const compareMonth = shiftMonth(month, -1)
 
-  const monthSales = useMemo(() => inMonth(snapshot.sales, month), [snapshot.sales, month])
-  const compareSales = useMemo(() => inMonth(snapshot.sales, compareMonth), [snapshot.sales, compareMonth])
+  // Get owner's shop IDs for filtering
+  const ownerShopIds = isOwner
+    ? snapshot.shops.filter((s) => s.ownerId === ownerId).map((s) => s.id)
+    : snapshot.shops.map((s) => s.id)
+
+  const ownerShops = snapshot.shops.filter((s) => ownerShopIds.includes(s.id))
+
+  const monthSales = useMemo(
+    () => multiShopSales(snapshot.sales, ownerShops, month),
+    [snapshot.sales, ownerShops, month],
+  )
+  const compareSales = useMemo(
+    () => multiShopSales(snapshot.sales, ownerShops, compareMonth),
+    [snapshot.sales, ownerShops, compareMonth],
+  )
   const combined = useMemo(() => sumSales(monthSales), [monthSales])
   const compareCombined = useMemo(() => sumSales(compareSales), [compareSales])
 
-  const perShop = snapshot.shops.map((shop) => {
+  const perShop = ownerShops.map((shop) => {
     const totals = sumSales(monthSales.filter((s) => s.shopId === shop.id))
     const prevTotals = sumSales(compareSales.filter((s) => s.shopId === shop.id))
     const health = healthOf(totals.profit, prevTotals.profit)
-    return { id: shop.id, name: shop.name, profit: totals.profit, status: health.status, goals: health.goals }
+    return {
+      id: shop.id,
+      name: shop.name,
+      profit: totals.profit,
+      status: health.status,
+      goals: health.goals,
+      a: totals,
+      b: prevTotals,
+    }
   })
 
   return (
     <div className="space-y-4">
-      <Header title="แดชบอร์ด" subtitle={`ทุกร้าน · ${snapshot.shops.length} ร้าน`} />
+      <Header title="แดชบอร์ด" subtitle={`ทุกร้าน · ${ownerShops.length} ร้าน`} />
 
       <MonthNav month={month} setMonth={setMonth} />
 
@@ -132,17 +159,24 @@ function MultiShopDashboard() {
 
       <ShopStatusGrid items={perShop} />
 
-      <ValueBreakdown sales={snapshot.sales} />
+      <ValueBreakdown getSales={(m) => multiShopSales(snapshot.sales, ownerShops, m)} />
 
       <DailyChart sales={monthSales} />
 
-      <CompareCard
-        month={month}
-        compareMonth={compareMonth}
-        setCompareMonth={setCompareMonth}
-        a={combined}
-        b={compareCombined}
-      />
+      <div className="space-y-4">
+        <CompareCard month={month} a={combined} b={compareCombined} title="เปรียบเทียบเดือน · ทุกร้าน" />
+        <div className="grid grid-cols-2 gap-3">
+          {perShop.map((shop) => (
+            <CompareCard
+              key={shop.id}
+              month={month}
+              a={shop.a}
+              b={shop.b}
+              title={`เปรียบเทียบเดือน · ${shop.name}`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -224,19 +258,17 @@ function ShopStatusGrid({
   )
 }
 
-function ValueBreakdown({ sales }: { sales: Sale[] }) {
-  const rows = useMemo(() => {
-    const base = currentMonthKey()
-    return [0, 1, 2].map((i) => {
-      const key = shiftMonth(base, -i)
-      const prev = shiftMonth(base, -(i + 1))
-      const cur = sumSales(inMonth(sales, key)).profit
-      const before = sumSales(inMonth(sales, prev)).profit
-      const diff = cur - before
-      const pct = before !== 0 ? Math.round((diff / before) * 100) : cur !== 0 ? 100 : 0
-      return { key, profit: cur, pct }
-    })
-  }, [sales])
+function ValueBreakdown({ getSales }: { getSales: (month: string) => Sale[] }) {
+  const base = currentMonthKey()
+  const rows = [0, 1, 2].map((i) => {
+    const key = shiftMonth(base, -i)
+    const prev = shiftMonth(base, -(i + 1))
+    const cur = sumSales(getSales(key)).profit
+    const before = sumSales(getSales(prev)).profit
+    const diff = cur - before
+    const pct = before !== 0 ? Math.round((diff / before) * 100) : cur !== 0 ? 100 : 0
+    return { key, profit: cur, pct }
+  })
 
   return (
     <div className={`${cardClass} p-4`}>
@@ -349,46 +381,25 @@ function DailyChart({ sales }: { sales: Sale[] }) {
 
 function CompareCard({
   month,
-  compareMonth,
-  setCompareMonth,
   a,
   b,
+  title = 'เปรียบเทียบเดือน',
 }: {
   month: string
-  compareMonth: string
-  setCompareMonth: (fn: (m: string) => string) => void
   a: Totals
   b: Totals
+  title?: string
 }) {
+  const compareMonth = shiftMonth(month, -1)
   return (
     <div className={`${cardClass} p-4`}>
-      <h2 className="mb-3 text-sm font-semibold">เปรียบเทียบเดือน</h2>
+      <h2 className="mb-3 truncate text-xs font-semibold sm:text-sm">{title}</h2>
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <div>
-          <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">เดือนนี้</p>
-          <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium dark:bg-slate-800/60">
-            {monthLabel(month)}
-          </div>
+        <div className="rounded-xl bg-slate-50 px-2 py-1.5 text-xs font-medium dark:bg-slate-800/60 sm:px-3 sm:py-2">
+          {monthLabel(compareMonth)}
         </div>
-        <div>
-          <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">เทียบกับ</p>
-          <div className="flex items-center gap-1">
-            <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-300 text-sm dark:border-slate-700"
-              onClick={() => setCompareMonth((m) => shiftMonth(m, -1))}
-            >
-              ‹
-            </button>
-            <span className="flex-1 rounded-xl bg-slate-50 px-2 py-2 text-center text-xs font-medium dark:bg-slate-800/60">
-              {monthLabel(compareMonth)}
-            </span>
-            <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-300 text-sm dark:border-slate-700"
-              onClick={() => setCompareMonth((m) => shiftMonth(m, 1))}
-            >
-              ›
-            </button>
-          </div>
+        <div className="rounded-xl bg-slate-50 px-2 py-1.5 text-xs font-medium dark:bg-slate-800/60 sm:px-3 sm:py-2">
+          {monthLabel(month)}
         </div>
       </div>
 
@@ -430,13 +441,14 @@ function CompareRow({
   const fmt = (n: number) => (money ? baht(n) : `${n}${unit ?? ''}`)
   const pct = b !== 0 ? Math.round((diff / b) * 100) : a !== 0 ? 100 : 0
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm dark:border-slate-800">
+    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-xl border border-slate-100 px-2.5 py-2 text-xs dark:border-slate-800 sm:px-3 sm:text-sm">
       <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
+        <span className="text-slate-500 dark:text-slate-400">{fmt(b)}</span>
+        <span className="text-[10px] text-slate-400 sm:text-xs">vs</span>
         <span className={`font-semibold ${accent ? 'text-emerald-600' : ''}`}>{fmt(a)}</span>
-        <span className="text-xs text-slate-400">vs {fmt(b)}</span>
         <span
-          className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+          className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium sm:text-[11px] ${
             diff >= 0
               ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
               : 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-400'

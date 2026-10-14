@@ -26,8 +26,8 @@ export const DEMO_ACCOUNTS: GlobalAccount[] = [
 
 export function makeDemoSnapshot(): Snapshot {
   const shops: Shop[] = [
-    { id: 'shop1', name: 'ร้านมือถือ 1', imageRef: pic('shopfront1'), phone: '081-000-0001', summaryDay: 31 },
-    { id: 'shop2', name: 'ร้านมือถือ 2', imageRef: pic('shopfront2'), phone: '081-000-0002', summaryDay: 31 },
+    { id: 'shop1', name: 'ร้านมือถือ 1', imageRef: pic('shopfront1'), phone: '081-000-0001', summaryDay: 31, ownerId: 'acc_owner' },
+    { id: 'shop2', name: 'ร้านมือถือ 2', imageRef: pic('shopfront2'), phone: '081-000-0002', summaryDay: 31, ownerId: 'acc_owner' },
   ]
 
   const employees: Employee[] = [

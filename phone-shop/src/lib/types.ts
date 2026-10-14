@@ -10,6 +10,7 @@ export interface Shop {
   imageRef: string | null
   phone: string
   summaryDay?: number
+  ownerId?: string
 }
 
 export interface Employee {
@@ -17,7 +18,7 @@ export interface Employee {
   shopId: string
   name: string
   email: string
-  role: 'staff'
+  role: Role
   status: EmployeeStatus
   deletedBy?: string
   avatarRef?: string | null
@@ -28,7 +29,7 @@ export interface GlobalAccount {
   id: string
   name: string
   email: string
-  role: 'admin' | 'owner'
+  role: Role
   password?: string
 }
 
@@ -79,6 +80,7 @@ export interface Sale {
   battery: string
   imei: string
   condition: string
+  region?: string
   costPrice: number
   sellPrice: number
   profit: number
@@ -101,6 +103,7 @@ export interface Snapshot {
 export interface Backend {
   readonly mode: 'local' | 'firebase'
   load(): Promise<Snapshot>
+  subscribe(onData: (snapshot: Snapshot) => void, onError?: (error: unknown) => void): () => void
   upsertDevice(device: Device): Promise<void>
   deleteDevice(id: string): Promise<void>
   upsertSale(sale: Sale): Promise<void>

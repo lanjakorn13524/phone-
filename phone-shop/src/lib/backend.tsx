@@ -8,9 +8,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Backend, Device, Employee, GlobalAccount, Sale, Shop, Snapshot } from './types'
+import type { Backend, Device, Employee, GlobalAccount, Role, Sale, Shop, Snapshot } from './types'
 import { DEMO_ACCOUNTS, makeDemoSnapshot } from './demo'
 import { createFirestoreBackend, isFirebaseConfigured } from './firestoreBackend'
+import { hashPassword } from './password'
 
 const LS_KEY = 'phone-shop:data'
 
@@ -73,6 +74,18 @@ function localBackend(): Backend {
       writeLocal(demo)
       memory = demo
       return demo
+    },
+    subscribe(onData) {
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== LS_KEY) return
+        const next = readLocal()
+        if (!next) return
+        const normalized = normalize(next)
+        memory = normalized
+        onData(normalized)
+      }
+      window.addEventListener('storage', onStorage)
+      return () => window.removeEventListener('storage', onStorage)
     },
     async upsertDevice(device) {
       const s = current()
@@ -143,8 +156,10 @@ interface BackendContextValue {
   deleteShop: (id: string) => Promise<void>
   updateEmployee: (employee: Employee) => Promise<void>
   deleteEmployee: (id: string) => Promise<void>
-  addEmployee: (shopId: string, name: string, email: string, avatarRef?: string | null) => Promise<Employee>
+  addEmployee: (shopId: string, name: string, email: string, password: string, avatarRef?: string | null) => Promise<Employee>
   updateAccount: (account: GlobalAccount) => Promise<void>
+  saveAccount: (id: string, patch: { name: string; email: string; password?: string; role?: Role }) => Promise<void>
+  deleteDevice: (id: string) => Promise<void>
 }
 
 const BackendContext = createContext<BackendContextValue | null>(null)
@@ -165,6 +180,17 @@ export function BackendProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
+    let unsubscribe: (() => void) | null = null
+
+    const startRealtime = () => {
+      unsubscribe = backend.subscribe(
+        (next) => {
+          if (alive) setSnapshot(normalize(next))
+        },
+        () => {},
+      )
+    }
+
     backend
       .load()
       .then(async (loaded) => {
@@ -176,10 +202,12 @@ export function BackendProvider({ children }: { children: ReactNode }) {
           if (!alive) return
           setSnapshot(seeded)
           setReady(true)
+          startRealtime()
           return
         }
         setSnapshot(normalize(loaded))
         setReady(true)
+        startRealtime()
       })
       .catch((e: unknown) => {
         if (!alive) return
@@ -188,6 +216,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       })
     return () => {
       alive = false
+      unsubscribe?.()
     }
   }, [backend])
 
@@ -264,8 +293,22 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     [backend],
   )
 
+  const deleteDevice = useCallback(
+    async (id: string) => {
+      await backend.deleteDevice(id)
+      setSnapshot((s) => ({ ...s, devices: s.devices.filter((x) => x.id !== id) }))
+    },
+    [backend],
+  )
+
   const addEmployee = useCallback(
-    async (shopId: string, name: string, email: string, avatarRef?: string | null): Promise<Employee> => {
+    async (
+      shopId: string,
+      name: string,
+      email: string,
+      password: string,
+      avatarRef?: string | null,
+    ): Promise<Employee> => {
       const employee: Employee = {
         id: newId('emp'),
         shopId,
@@ -273,11 +316,46 @@ export function BackendProvider({ children }: { children: ReactNode }) {
         email: email.trim(),
         role: 'staff',
         status: 'active',
+        ...(password ? { password: await hashPassword(password) } : {}),
         ...(avatarRef ? { avatarRef } : {}),
       }
       await backend.upsertEmployee(employee)
       setSnapshot((s) => ({ ...s, employees: upsert(s.employees, employee) }))
       return employee
+    },
+    [backend],
+  )
+
+  const saveAccount = useCallback(
+    async (id: string, patch: { name: string; email: string; password?: string; role?: Role }) => {
+      const hashed = patch.password ? await hashPassword(patch.password) : undefined
+      const name = patch.name.trim()
+      const email = patch.email.trim()
+      const employee = snapRef.current.employees.find((e) => e.id === id)
+      if (employee) {
+        const next = {
+          ...employee,
+          name,
+          email,
+          ...(patch.role ? { role: patch.role } : {}),
+          ...(hashed ? { password: hashed } : {}),
+        }
+        await backend.upsertEmployee(next)
+        setSnapshot((s) => ({ ...s, employees: upsert(s.employees, next) }))
+        return
+      }
+      const account = snapRef.current.accounts.find((a) => a.id === id)
+      if (account) {
+        const next = {
+          ...account,
+          name,
+          email,
+          ...(patch.role ? { role: patch.role } : {}),
+          ...(hashed ? { password: hashed } : {}),
+        }
+        await backend.upsertAccount(next)
+        setSnapshot((s) => ({ ...s, accounts: upsert(s.accounts, next) }))
+      }
     },
     [backend],
   )
@@ -305,7 +383,9 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       updateEmployee,
       deleteEmployee,
       addEmployee,
+      deleteDevice,
       updateAccount,
+      saveAccount,
     }),
     [
       backend.mode,
@@ -321,7 +401,9 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       updateEmployee,
       deleteEmployee,
       addEmployee,
+      deleteDevice,
       updateAccount,
+      saveAccount,
     ],
   )
 

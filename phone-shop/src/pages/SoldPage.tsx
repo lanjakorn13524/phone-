@@ -9,17 +9,17 @@ import {
   currentMonthKey,
   dayLabel,
   monthLabel,
-  monthRange,
   paymentLabel,
   shiftMonth,
   summaryDayOf,
+  summaryPeriodLabel,
   summaryRange,
   timeLabel,
 } from '../lib/format'
 import type { Sale } from '../lib/types'
 
 export function SoldPage() {
-  const { activeShop, isStaff } = useAuth()
+  const { activeShop, isStaff, isOwner, session } = useAuth()
   const { snapshot, deleteSale } = useBackend()
   const location = useLocation()
   const [month, setMonth] = useState(currentMonthKey())
@@ -28,20 +28,41 @@ export function SoldPage() {
     return typeof sid === 'string' ? sid : ''
   })
 
+  // Get owner's shop IDs for filtering
+  const ownerShopIds = isOwner
+    ? snapshot.shops.filter((s) => s.ownerId === session?.id).map((s) => s.id)
+    : []
+
   const rangeShop = isStaff
     ? activeShop
     : shopFilter
-      ? snapshot.shops.find((s) => s.id === shopFilter)
-      : null
+    ? snapshot.shops.find((s) => s.id === shopFilter)
+    : null
   const summaryDay = summaryDayOf(rangeShop)
 
   const sales = useMemo(() => {
-    const { start, end } = rangeShop ? summaryRange(month, summaryDay) : monthRange(month)
-    return snapshot.sales
-      .filter((s) => (isStaff ? s.shopId === activeShop?.id : shopFilter ? s.shopId === shopFilter : true))
-      .filter((s) => s.soldAt >= start && s.soldAt < end)
+    const single = isStaff || Boolean(shopFilter)
+    const { start, end } = summaryRange(month, summaryDay)
+    let filtered = snapshot.sales
+
+    // Filter by owner's shops for owner role
+    if (isOwner) {
+      filtered = filtered.filter((s) => ownerShopIds.includes(s.shopId))
+    } else if (isStaff) {
+      filtered = filtered.filter((s) => s.shopId === activeShop?.id)
+    } else if (shopFilter) {
+      filtered = filtered.filter((s) => s.shopId === shopFilter)
+    }
+
+    return filtered
+      .filter((s) => {
+        if (single) return s.soldAt >= start && s.soldAt < end
+        const shop = snapshot.shops.find((x) => x.id === s.shopId)
+        const range = summaryRange(month, summaryDayOf(shop))
+        return s.soldAt >= range.start && s.soldAt < range.end
+      })
       .sort((a, b) => b.soldAt - a.soldAt)
-  }, [snapshot.sales, isStaff, activeShop?.id, shopFilter, month, rangeShop, summaryDay])
+  }, [snapshot.sales, snapshot.shops, isStaff, isOwner, activeShop?.id, shopFilter, month, summaryDay, ownerShopIds, session?.id])
 
   function shopName(shopId: string): string {
     return snapshot.shops.find((x) => x.id === shopId)?.name ?? 'ร้าน'
@@ -83,7 +104,10 @@ export function SoldPage() {
         <div>
           <h1 className="text-lg font-bold">ขายแล้ว</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {monthLabel(month)} · {isStaff ? 'ร้านนี้' : 'รวมทุกร้าน'}
+            {monthLabel(month)} ·{' '}
+            {rangeShop
+              ? `${rangeShop.name} · ตัดยอด ${summaryPeriodLabel(month, summaryDay)}`
+              : 'รวมทุกร้าน'}
           </p>
         </div>
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
@@ -103,7 +127,10 @@ export function SoldPage() {
           >
             ทุกร้าน
           </button>
-          {snapshot.shops.map((s) => (
+          {(isOwner
+            ? snapshot.shops.filter((s) => s.ownerId === session?.id)
+            : snapshot.shops
+          ).map((s) => (
             <button
               key={s.id}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
@@ -170,6 +197,11 @@ export function SoldPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                {s.region ? (
+                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                    โมเดล {s.region}
+                  </span>
+                ) : null}
                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
                   ทุน {baht(s.costPrice)}
                 </span>

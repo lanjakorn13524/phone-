@@ -1,10 +1,31 @@
 import { useState } from 'react'
-import { CameraIcon, TrashIcon } from './icons'
-import { btnGhost, btnPrimary, inputClass, labelClass, Modal, Thumb } from './ui'
+import { btnGhost, btnPrimary, inputClass, labelClass, Modal } from './ui'
 import { useBackend } from '../lib/backend'
 import { baht } from '../lib/format'
-import { useImageStore } from '../lib/images'
 import type { Device } from '../lib/types'
+
+const CHECK_LABELS: Record<string, string> = {
+  model: 'โมเดล / ภูมิภาค',
+  accessories: 'มีอุปกรณ์อะไรบ้าง',
+  parts: 'แจ้งเตือนเปลี่ยนชิ้นส่วน',
+}
+
+const PART_LABELS: Record<string, string> = {
+  battery: 'แบตเตอรี่',
+  screen: 'จอ',
+  camera: 'กล้อง',
+  frontcam: 'กล้องหน้า',
+  faceid: 'Face ID',
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right font-medium text-slate-700 dark:text-slate-200">{value}</span>
+    </div>
+  )
+}
 
 export function DeviceDetailModal({
   device,
@@ -16,7 +37,6 @@ export function DeviceDetailModal({
   onClose: () => void
 }) {
   const { snapshot, addDevice } = useBackend()
-  const images = useImageStore()
 
   const shop = snapshot.shops.find((s) => s.id === device.shopId)
 
@@ -28,52 +48,7 @@ export function DeviceDetailModal({
   const [condition, setCondition] = useState(device.condition)
   const [costPrice, setCostPrice] = useState(String(device.costPrice))
   const [sellPrice, setSellPrice] = useState(String(device.sellPrice))
-  const [deviceRefs, setDeviceRefs] = useState<string[]>(device.images.device)
-  const [idCardRef, setIdCardRef] = useState<string | null>(device.images.idCard)
   const [busy, setBusy] = useState(false)
-
-  const shopId = device.shopId
-  const shopName = shop?.name ?? 'shop'
-
-  async function addImages(files: FileList | null) {
-    if (!files || files.length === 0) return
-    setBusy(true)
-    const added: string[] = []
-    let i = 0
-    for (const file of Array.from(files)) {
-      const ref = await images.put(file, {
-        shopId,
-        shopName,
-        imei: imei.trim() || device.imei,
-        kind: 'device',
-        index: Date.now() + i,
-      })
-      added.push(ref)
-      i += 1
-    }
-    setDeviceRefs((prev) => [...prev, ...added])
-    setBusy(false)
-  }
-
-  async function replaceIdCard(file: File | undefined) {
-    if (!file) return
-    setBusy(true)
-    const ref = await images.put(file, {
-      shopId,
-      shopName,
-      imei: imei.trim() || device.imei,
-      kind: 'idcard',
-      index: Date.now(),
-    })
-    if (idCardRef) await images.remove(idCardRef)
-    setIdCardRef(ref)
-    setBusy(false)
-  }
-
-  async function removeDeviceImage(ref: string) {
-    await images.remove(ref)
-    setDeviceRefs((prev) => prev.filter((r) => r !== ref))
-  }
 
   async function save() {
     setBusy(true)
@@ -87,7 +62,6 @@ export function DeviceDetailModal({
       condition: condition.trim(),
       costPrice: Number(costPrice) || 0,
       sellPrice: Number(sellPrice) || 0,
-      images: { device: deviceRefs, idCard: idCardRef },
     }
     await addDevice(updated)
     setBusy(false)
@@ -121,49 +95,6 @@ export function DeviceDetailModal({
         {shop ? (
           <p className="text-xs text-slate-500 dark:text-slate-400">ร้าน: {shop.name}</p>
         ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          {deviceRefs.map((ref) => (
-            <div key={ref} className="relative">
-              <Thumb imageRef={ref} alt="รูปเครื่อง" className="h-20 w-20 rounded-xl" />
-              {!readOnly ? (
-                <button
-                  className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-white"
-                  onClick={() => removeDeviceImage(ref)}
-                >
-                  <TrashIcon className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
-            </div>
-          ))}
-          {idCardRef ? (
-            <Thumb imageRef={idCardRef} alt="บัตรประชาชน" className="h-20 w-20 rounded-xl ring-2 ring-brand-400" />
-          ) : null}
-          {readOnly ? null : (
-            <>
-              <label className={`${btnGhost} h-20 cursor-pointer px-3`}>
-                <CameraIcon className="h-4 w-4" />
-                เพิ่มรูป
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => void addImages(e.target.files)}
-                />
-              </label>
-              <label className={`${btnGhost} h-20 cursor-pointer px-3`}>
-                เปลี่ยนบัตร ปชช.
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => void replaceIdCard(e.target.files?.[0])}
-                />
-              </label>
-            </>
-          )}
-        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
@@ -199,6 +130,30 @@ export function DeviceDetailModal({
             <input className={inputClass} type="number" value={sellPrice} disabled={readOnly} onChange={(e) => setSellPrice(e.target.value)} />
           </div>
         </div>
+
+        {device.checklist ? (
+          <div className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">ข้อมูลตรวจเช็ค</p>
+            {device.checklist.answers.model ? (
+              <InfoRow label={CHECK_LABELS.model} value={device.checklist.answers.model} />
+            ) : null}
+            {(device.checklist.multiple.accessories ?? []).length > 0 ? (
+              <InfoRow
+                label={CHECK_LABELS.accessories}
+                value={(device.checklist.multiple.accessories ?? []).join(', ')}
+              />
+            ) : null}
+            {device.checklist.answers.parts ? (
+              <InfoRow label={CHECK_LABELS.parts} value={device.checklist.answers.parts} />
+            ) : null}
+            {device.checklist.answers.parts === 'มีแจ้ง'
+              ? Object.entries(device.checklist.parts)
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => <InfoRow key={k} label={PART_LABELS[k] ?? k} value={v} />)
+              : null}
+            <InfoRow label="ตรวจโดย" value={device.checklist.checkedBy} />
+          </div>
+        ) : null}
 
         {readOnly ? (
           <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">

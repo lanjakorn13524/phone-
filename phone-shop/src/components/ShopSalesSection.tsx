@@ -129,6 +129,9 @@ export function ShopSalesSection({ shopId }: { shopId: string }) {
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                    {s.region ? (
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">โมเดล {s.region}</span>
+                    ) : null}
                     <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">{paymentLabel(s.paymentMethod)}</span>
                     <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
                       ขายโดย {sellerName(s)}

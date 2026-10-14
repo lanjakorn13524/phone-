@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckIcon } from '../components/icons'
-import { btnGhost, btnPrimary, cardClass, inputClass, labelClass } from '../components/ui'
+import { CheckIcon, ChevronDownIcon } from '../components/icons'
+import { btnPrimary, cardClass, inputClass, labelClass } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { newId, useBackend } from '../lib/backend'
 import type { Device, DeviceChecklist } from '../lib/types'
@@ -31,6 +31,7 @@ const PARTS_GROUPS: CheckRule[] = [
 
 const MEMORY_OPTIONS = ['64GB', '128GB', '256GB', '512GB', '1TB', '2TB']
 const RAM_OPTIONS = ['4GB', '6GB', '8GB', '12GB', '16GB']
+const BATTERY_OPTIONS = Array.from({ length: 31 }, (_, i) => `${70 + i}%`)
 
 function Chip({
   label,
@@ -72,6 +73,7 @@ export function AddPage() {
   const [memory, setMemory] = useState('')
   const [ram, setRam] = useState('')
   const [battery, setBattery] = useState('')
+  const [batteryOpen, setBatteryOpen] = useState(false)
   const [condition, setCondition] = useState('')
   const [costPrice, setCostPrice] = useState('')
   const [sellPrice, setSellPrice] = useState('')
@@ -167,16 +169,6 @@ export function AddPage() {
 
   return (
     <div className="space-y-4 pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold">เพิ่มเครื่อง</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">กรอกข้อมูลและตรวจเช็คให้ครบก่อนบันทึกเข้าสต็อก</p>
-        </div>
-        <button className={btnGhost} onClick={resetForm}>
-          เริ่มใหม่
-        </button>
-      </div>
-
       <div className={`${cardClass} space-y-4 p-4`}>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
@@ -194,6 +186,7 @@ export function AddPage() {
                       if (value === 'android') {
                         setAnswer((prev) => ({ ...prev, model: '', parts: '' }))
                         setPartsDetail({})
+                        setBattery('')
                       }
                     }}
                   />
@@ -286,15 +279,50 @@ export function AddPage() {
               </div>
             )
           })}
+          {platform === 'iphone' && (
+            <div className="col-span-2">
+              <label className={labelClass}>แบตเตอรี่</label>
+              <div className="relative">
+                {batteryOpen ? (
+                  <div className="fixed inset-0 z-10" onClick={() => setBatteryOpen(false)} />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setBatteryOpen((o) => !o)}
+                  className={`${inputClass} relative z-20 flex items-center justify-between text-left`}
+                >
+                  <span className={battery ? '' : 'text-slate-400'}>{battery || 'เลือกเปอร์เซ็นต์'}</span>
+                  <ChevronDownIcon className={`size-4 shrink-0 transition ${batteryOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {batteryOpen ? (
+                  <div className="relative z-20 mt-1.5 flex gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    {BATTERY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          setBattery(opt)
+                          setBatteryOpen(false)
+                        }}
+                        className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                          battery === opt
+                            ? 'border-brand-600 bg-brand-600 text-white'
+                            : 'border-slate-300 text-slate-600 hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
           <div className="col-span-2">
             <label className={labelClass}>IMEI</label>
             <input className={inputClass} value={imei} onChange={(e) => setImei(e.target.value)} inputMode="numeric" />
           </div>
-          <div>
-            <label className={labelClass}>แบตเตอรี่</label>
-            <input className={inputClass} value={battery} onChange={(e) => setBattery(e.target.value)} placeholder="90%" />
-          </div>
-          <div>
+          <div className="col-span-2">
             <label className={labelClass}>ตำหนิ / สภาพ</label>
             <input className={inputClass} value={condition} onChange={(e) => setCondition(e.target.value)} />
           </div>

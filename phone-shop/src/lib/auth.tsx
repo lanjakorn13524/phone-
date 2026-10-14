@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -71,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const next: Session = {
         id: employee.id,
-        role: 'staff',
+        role: employee.role ?? 'staff',
         shopId: employee.shopId,
         name: employee.name,
         email: employee.email,
@@ -87,6 +88,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(KEY)
     setSession(null)
   }, [])
+
+  useEffect(() => {
+    setSession((current) => {
+      if (!current) return current
+      const employee = snapshot.employees.find((e) => e.id === current.id)
+      const account = snapshot.accounts.find((a) => a.id === current.id)
+      const name = employee?.name ?? account?.name
+      const email = employee?.email ?? account?.email
+      if (!name || (name === current.name && email === current.email)) return current
+      const next = { ...current, name, email: email ?? current.email }
+      localStorage.setItem(KEY, JSON.stringify(next))
+      return next
+    })
+  }, [snapshot.employees, snapshot.accounts])
 
   const updateProfile = useCallback(
     async (patch: { name?: string; email?: string }) => {

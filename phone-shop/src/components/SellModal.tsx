@@ -52,6 +52,7 @@ export function SellModal({
         battery: device.battery,
         imei: device.imei,
         condition: device.condition,
+        region: device.checklist?.answers.model || undefined,
         costPrice: device.costPrice,
         sellPrice,
         profit,
@@ -92,6 +93,9 @@ export function SellModal({
         <p className="text-slate-500 dark:text-slate-400">
           {device.color} · {device.memory} · แบต {device.battery} · IMEI {device.imei}
         </p>
+        {device.checklist?.answers.model ? (
+          <p className="text-slate-500 dark:text-slate-400">โมเดล / ภูมิภาค {device.checklist.answers.model}</p>
+        ) : null}
       </div>
 
       <div className="space-y-4">

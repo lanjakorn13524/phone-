@@ -172,3 +172,38 @@ export const LoaderIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </Svg>
 )
+
+export const KeyIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="m11.9 11.1 9.1-9.1M17 6l2 2M14 9l2 2" />
+  </Svg>
+)
+
+export const UserIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </Svg>
+)
+
+export const ShieldIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </Svg>
+)
+
+export const EyeIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+)
+
+export const EyeOffIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.06 4.06M6.6 6.6A17.6 17.6 0 0 0 2 11s3.5 7 10 7a9.1 9.1 0 0 0 4.24-.95" />
+    <path d="M14.12 14.12A3 3 0 1 1 9.88 9.88" />
+    <path d="m2 2 20 20" />
+  </Svg>
+)
