@@ -98,6 +98,9 @@ export function createFirestoreBackend(): Backend {
     async upsertAccount(account) {
       await setDoc(doc(db, 'accounts', account.id), { ...account, id: account.id })
     },
+    async deleteAccount(id) {
+      await deleteDoc(doc(db, 'accounts', id))
+    },
     async seed(snapshot) {
       const batch = writeBatch(db)
       snapshot.shops.forEach((x) => batch.set(doc(db, 'shops', x.id), { ...x, id: x.id }))

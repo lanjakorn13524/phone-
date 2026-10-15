@@ -26,3 +26,4 @@ backups/
 
 # หมายเหตุ: migration/seed ของ Supabase ต้อง track ใน git
 # (เคยเป็นบรรทัด `*.sql` ทำให้ supabase/migrations/*.sql ไม่ถูก commit เลย)
+.vercel

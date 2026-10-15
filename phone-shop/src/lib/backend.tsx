@@ -136,6 +136,11 @@ function localBackend(): Backend {
       writeLocal({ ...s, accounts: upsert(s.accounts, account) })
       memory = readLocal()
     },
+    async deleteAccount(id) {
+      const s = current()
+      writeLocal({ ...s, accounts: s.accounts.filter((x) => x.id !== id) })
+      memory = readLocal()
+    },
     async seed(snapshot) {
       writeLocal(snapshot)
       memory = snapshot
@@ -158,6 +163,7 @@ interface BackendContextValue {
   deleteEmployee: (id: string) => Promise<void>
   addEmployee: (shopId: string, name: string, email: string, password: string, avatarRef?: string | null) => Promise<Employee>
   updateAccount: (account: GlobalAccount) => Promise<void>
+  deleteAccount: (id: string) => Promise<void>
   saveAccount: (id: string, patch: { name: string; email: string; password?: string; role?: Role }) => Promise<void>
   deleteDevice: (id: string) => Promise<void>
 }
@@ -368,6 +374,14 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     [backend],
   )
 
+  const deleteAccount = useCallback(
+    async (id: string) => {
+      await backend.deleteAccount(id)
+      setSnapshot((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== id) }))
+    },
+    [backend],
+  )
+
   const value = useMemo<BackendContextValue>(
     () => ({
       mode: backend.mode,
@@ -385,6 +399,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       addEmployee,
       deleteDevice,
       updateAccount,
+      deleteAccount,
       saveAccount,
     }),
     [
@@ -403,6 +418,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       addEmployee,
       deleteDevice,
       updateAccount,
+      deleteAccount,
       saveAccount,
     ],
   )

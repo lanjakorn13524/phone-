@@ -5,7 +5,7 @@ import { btnDanger, btnGhost, btnPrimary, cardClass, inputClass, labelClass, Mod
 import { useAuth } from '../lib/auth'
 import { newId, useBackend } from '../lib/backend'
 import { useImageStore } from '../lib/images'
-import type { Role, Shop } from '../lib/types'
+import type { Employee, Role, Shop } from '../lib/types'
 
 export function ShopsPage() {
   const { session, isOwner, isAdmin } = useAuth()
@@ -18,10 +18,28 @@ export function ShopsPage() {
   const [busy, setBusy] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<{ emp: any; shopId: string } | null>(null)
 
-  // Filter shops for owner - only their shops
+  // Owner จัดการได้เฉพาะร้านของตัวเอง ส่วนแอดมินเห็นทุกร้าน
   const shops = isOwner
     ? snapshot.shops.filter((s) => s.ownerId === session?.id)
     : snapshot.shops
+
+  // รายชื่อเจ้าของทั้งหมด (ให้แอดมินเลือกตอนเพิ่มร้าน)
+  const ownerOptions = [
+    ...snapshot.accounts
+      .filter((a) => a.role === 'owner')
+      .map((a) => ({ id: a.id, name: a.name, email: a.email })),
+    ...snapshot.employees
+      .filter((e) => e.role === 'owner' && e.status !== 'deleted')
+      .map((e) => ({ id: e.id, name: e.name, email: e.email })),
+  ]
+
+  function personName(id?: string | null): string {
+    if (!id) return '—'
+    const account = snapshot.accounts.find((a) => a.id === id)
+    if (account) return account.name
+    const employee = snapshot.employees.find((e) => e.id === id)
+    return employee?.name ?? '—'
+  }
 
   function flash(msg: string) {
     setToast(msg)
@@ -32,21 +50,6 @@ export function ShopsPage() {
     if (!window.confirm(`ลบร้าน "${shop.name}" และพนักงานทั้งหมดในร้าน?`)) return
     await deleteShop(shop.id)
     flash(`ลบร้าน ${shop.name} แล้ว`)
-  }
-
-  async function removeEmployee(id: string, name: string) {
-    if (isOwner) {
-      if (!window.confirm(`ลบพนักงาน "${name}" ออกถาวร?\n(แอดมินจะเห็นเป็นสถานะถูกลบ · ข้อมูลที่พนักงานเคยกรอกยังอยู่ครบ)`))
-        return
-      const emp = snapshot.employees.find((e) => e.id === id)
-      if (!emp) return
-      await updateEmployee({ ...emp, status: 'deleted', deletedBy: session?.name ?? 'เจ้าของ' })
-      flash(`ลบพนักงาน ${name} แล้ว · ข้อมูลที่เคยกรอกยังอยู่`)
-    } else {
-      if (!window.confirm(`ลบพนักงาน "${name}" ออกถาวร?\n(ข้อมูลที่พนักงานเคยกรอกยังอยู่ครบ)`)) return
-      await deleteEmployee(id)
-      flash(`ลบพนักงาน ${name} แล้ว · ข้อมูลที่เคยกรอกยังอยู่`)
-    }
   }
 
   function openEditEmployee(emp: any, shopId: string) {
@@ -74,7 +77,10 @@ export function ShopsPage() {
     flash(`บันทึกข้อมูลพนักงาน ${patch.name} แล้ว`)
   }
 
-  async function saveShop(input: { name: string; phone: string; file: File | null; summaryDay: number }, target: Shop | 'new') {
+  async function saveShop(
+    input: { name: string; phone: string; file: File | null; summaryDay: number; ownerId: string | null },
+    target: Shop | 'new',
+  ) {
     setBusy(true)
     const id = target === 'new' ? newId('shop') : target.id
     const name = input.name.trim() || 'ร้านใหม่'
@@ -88,15 +94,16 @@ export function ShopsPage() {
         index: 0,
       })
     }
-    // Set ownerId for new shops created by owner
-    const ownerId = target === 'new' && isOwner ? session?.id : target === 'new' ? undefined : target.ownerId
-    await updateShop({ id, name, phone: input.phone.trim(), imageRef, summaryDay: input.summaryDay, ownerId })
+    // เจ้าของที่สร้างร้านเองเป็นเจ้าของร้านนั้นเสมอ ส่วนแอดมินเลือกเจ้าของได้
+    const ownerId = isOwner ? session?.id : input.ownerId ?? undefined
+    const adminId = target === 'new' ? (isAdmin ? session?.id : undefined) : target.adminId
+    await updateShop({ id, name, phone: input.phone.trim(), imageRef, summaryDay: input.summaryDay, ownerId, adminId })
     setBusy(false)
     setEditing(null)
     flash(target === 'new' ? 'เพิ่มร้านแล้ว' : 'บันทึกข้อมูลร้านแล้ว')
   }
 
-  return (
+return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
@@ -112,110 +119,20 @@ export function ShopsPage() {
 
       {!isOwner && <PasswordManagerCard onFlash={flash} />}
 
-      {shops.map((shop) => {
-        const staff = snapshot.employees.filter((e) => e.shopId === shop.id)
-        const visible = isOwner ? staff.filter((e) => e.status !== 'deleted') : staff
-        const isOwnerShop = shop.ownerId === session?.id
-        return (
-          <div key={shop.id} className={`${cardClass} overflow-hidden`}>
-            <div className="flex items-center gap-3 p-4">
-              <Thumb imageRef={shop.imageRef} alt={shop.name} className="h-14 w-14 shrink-0 rounded-xl" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="truncate font-semibold">{shop.name}</p>
-                  {isOwnerShop && <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-900/40 dark:text-brand-400">เจ้าของ</span>}
-                  {shop.ownerId && shop.ownerId !== session?.id && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-600 dark:bg-sky-900/40 dark:text-sky-400">แอดมิน</span>}
-                </div>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">{shop.phone || 'ไม่มีเบอร์'}</p>
-              </div>
-              <button className={`${btnGhost} px-3 py-2 text-xs`} onClick={() => setEditing(shop)}>
-                แก้ไข
-              </button>
-              <button className={`${btnDanger} px-3 py-2 text-xs`} onClick={() => removeShop(shop)}>
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="border-t border-slate-100 p-4 dark:border-slate-800">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  พนักงาน {visible.length} คน
-                </p>
-                <button className={`${btnGhost} px-3 py-1.5 text-xs`} onClick={() => setAddEmpShop(shop.id)}>
-                  <UserPlusIcon className="h-3.5 w-3.5" /> เพิ่มพนักงาน
-                </button>
-              </div>
-              <div className="space-y-2">
-                {visible.length === 0 ? (
-                  <p className="text-xs text-slate-400">ไม่มีพนักงาน</p>
-                ) : (
-                  visible.map((e) => (
-                    <div
-                      key={e.id}
-                      className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60"
-                    >
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        {e.avatarRef ? (
-                          <Thumb
-                            imageRef={e.avatarRef}
-                            alt={e.name}
-                            className="h-9 w-9 shrink-0 rounded-full"
-                          />
-                        ) : (
-                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
-                            {e.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="truncate text-sm">{e.name}</p>
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{e.email}</p>
-                            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                              {ROLE_LABEL[e.role] ?? e.role}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {e.status === 'deleted' ? (
-                          <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] text-red-500 dark:bg-red-950/40 dark:text-red-400">
-                            ถูกลบโดยเจ้าของ
-                          </span>
-                        ) : (
-                          <>
-                            {(isAdmin || isOwner) ? (
-                              <button
-                                className="grid h-8 w-8 place-items-center rounded-lg text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10"
-                                onClick={() => openEditEmployee(e, shop.id)}
-                                title="แก้ไขพนักงาน"
-                              >
-                                <UserIcon className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <button
-                                className="grid h-8 w-8 place-items-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
-                                onClick={() => removeEmployee(e.id, e.name)}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            <ShopSalesSection shopId={shop.id} />
-          </div>
-        )
-      })}
+      {isOwner ? (
+        // Owner view - group by owner (just their shops)
+        <OwnerShopsSection shops={shops} snapshot={snapshot} personName={personName} onEdit={setEditing} onRemove={removeShop} onAddEmp={setAddEmpShop} onEditEmployee={openEditEmployee} />
+      ) : (
+        // Admin view - group by owner
+        <AdminShopsSection shops={shops} snapshot={snapshot} personName={personName} onEdit={setEditing} onRemove={removeShop} onAddEmp={setAddEmpShop} onEditEmployee={openEditEmployee} />
+      )}
 
       {editing ? (
         <ShopModal
           shop={editing === 'new' ? null : editing}
           busy={busy}
+          owners={ownerOptions}
+          isAdmin={isAdmin}
           onClose={() => setEditing(null)}
           onSave={(input) => saveShop(input, editing)}
         />
@@ -266,17 +183,28 @@ export function ShopsPage() {
 function ShopModal({
   shop,
   busy,
+  owners,
+  isAdmin,
   onClose,
   onSave,
 }: {
   shop: Shop | null
   busy: boolean
+  owners: { id: string; name: string; email: string }[]
+  isAdmin: boolean
   onClose: () => void
-  onSave: (input: { name: string; phone: string; file: File | null; summaryDay: number }) => void
+  onSave: (input: {
+    name: string
+    phone: string
+    file: File | null
+    summaryDay: number
+    ownerId: string | null
+  }) => void
 }) {
   const [name, setName] = useState(shop?.name ?? '')
   const [phone, setPhone] = useState(shop?.phone ?? '')
   const [summaryDay, setSummaryDay] = useState(shop?.summaryDay ?? 31)
+  const [ownerId, setOwnerId] = useState(shop?.ownerId ?? '')
   const [file, setFile] = useState<File | null>(null)
 
   return (
@@ -292,7 +220,7 @@ function ShopModal({
           </button>
           <button
             className={`${btnPrimary} px-4 py-2`}
-            onClick={() => onSave({ name, phone, file, summaryDay })}
+            onClick={() => onSave({ name, phone, file, summaryDay, ownerId: ownerId || null })}
             disabled={busy || !name.trim()}
           >
             {busy ? 'กำลังบันทึก...' : 'บันทึก'}
@@ -310,6 +238,22 @@ function ShopModal({
           </label>
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น ร้านสายฟ้าโฟน" />
         </div>
+        {isAdmin ? (
+          <div>
+            <label className={labelClass}>เจ้าของร้าน</label>
+            <select className={inputClass} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
+              <option value="">— ไม่ระบุเจ้าของ —</option>
+              {owners.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name} ({o.email})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              เลือกเจ้าของเพื่อให้ร้านนี้รวมสต็อกกับร้านอื่นของเจ้าของคนเดียวกัน
+            </p>
+          </div>
+        ) : null}
         <div>
           <label className={labelClass}>เบอร์โทร</label>
           <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08x-xxx-xxxx" inputMode="tel" />
@@ -669,7 +613,7 @@ interface PasswordTarget {
 }
 
 function PasswordManagerCard({ onFlash }: { onFlash: (msg: string) => void }) {
-  const { snapshot, saveAccount, deleteEmployee } = useBackend()
+  const { snapshot, saveAccount, deleteEmployee, deleteAccount } = useBackend()
   const { session, isAdmin } = useAuth()
   const [target, setTarget] = useState<PasswordTarget | null>(null)
 
@@ -680,18 +624,16 @@ function PasswordManagerCard({ onFlash }: { onFlash: (msg: string) => void }) {
       .map((e) => ({ id: e.id, name: e.name, email: e.email, role: e.role })),
   ]
 
-  async function handleDeleteAccount(id: string) {
-    if (!window.confirm('ลบบัญชีนี้ออกถาวร?')) return
-    // Check if it's an employee
+  async function handleDeleteAccount(id: string, name: string) {
+    if (!window.confirm(`ลบบัญชี "${name}" ออกถาวร?\n(บัญชีนี้จะเข้าสู่ระบบไม่ได้อีก)`)) return
     const emp = snapshot.employees.find((e) => e.id === id)
     if (emp) {
       await deleteEmployee(id)
-      onFlash('ลบพนักงานแล้ว')
-    } else {
-      // For global accounts, we'd need a deleteAccount function
-      // For now, just show not supported
-      onFlash('ไม่สามารถลบบัญชีผู้ดูแลระบบได้ในหน้านี้')
+      onFlash(`ลบพนักงาน ${name} แล้ว`)
+      return
     }
+    await deleteAccount(id)
+    onFlash(`ลบบัญชี ${name} แล้ว`)
   }
 
   return (
@@ -701,7 +643,7 @@ function PasswordManagerCard({ onFlash }: { onFlash: (msg: string) => void }) {
         <h2 className="text-sm font-semibold">จัดการบัญชี</h2>
       </div>
       <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        แก้ไขชื่อ อีเมล และรหัสผ่านได้ทุกบัญชี รวมถึงเจ้าของและตัวเอง
+        แก้ไขชื่อ อีเมล และรหัสผ่านได้ทุกบัญชี รวมถึงเจ้าของและตัวเอง · ลบบัญชีได้ด้วยปุ่มถังขยะ
       </p>
       <div className="space-y-2">
         {rows.length === 0 ? (
@@ -735,7 +677,7 @@ function PasswordManagerCard({ onFlash }: { onFlash: (msg: string) => void }) {
                 {isAdmin && r.id !== session?.id && (
                   <button
                     className="grid h-8 w-8 place-items-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
-                    onClick={() => handleDeleteAccount(r.id)}
+                    onClick={() => handleDeleteAccount(r.id, r.name)}
                     title="ลบบัญชี"
                   >
                     <TrashIcon className="h-4 w-4" />
@@ -895,5 +837,220 @@ function EditAccountModal({
         {error ? <p className="text-xs text-red-500">{error}</p> : null}
       </div>
     </Modal>
+  )
+}
+
+function OwnerShopsSection({
+  shops,
+  snapshot,
+  personName,
+  onEdit,
+  onRemove,
+  onAddEmp,
+  onEditEmployee,
+}: {
+  shops: Shop[]
+  snapshot: any
+  personName: (id?: string | null) => string
+  onEdit: (shop: Shop) => void
+  onRemove: (shop: Shop) => void
+  onAddEmp: (shopId: string) => void
+  onEditEmployee: (emp: any, shopId: string) => void
+}) {
+  if (shops.length === 0) {
+    return (
+      <div className={`${cardClass} p-8 text-center text-slate-400`}>
+        <p className="mb-2">ยังไม่มีร้านของคุณ</p>
+        <p className="text-xs">กดปุ่มเพิ่มร้านเพื่อสร้างร้านแรก</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">ร้านของคุณ (เจ้าของ)</h2>
+      {shops.map((shop) => (
+        <ShopCard
+          key={shop.id}
+          shop={shop}
+          snapshot={snapshot}
+          personName={personName}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          onAddEmp={onAddEmp}
+          onEditEmployee={onEditEmployee}
+          isOwnerShop={true}
+        />
+      ))}
+    </div>
+  )
+}
+
+function AdminShopsSection({
+  shops,
+  snapshot,
+  personName,
+  onEdit,
+  onRemove,
+  onAddEmp,
+  onEditEmployee,
+}: {
+  shops: Shop[]
+  snapshot: any
+  personName: (id?: string | null) => string
+  onEdit: (shop: Shop) => void
+  onRemove: (shop: Shop) => void
+  onAddEmp: (shopId: string) => void
+  onEditEmployee: (emp: any, shopId: string) => void
+}) {
+  // Group shops by owner
+  const shopsByOwner = new Map<string, Shop[]>()
+  shops.forEach((shop) => {
+    const ownerKey = shop.ownerId ?? 'no-owner'
+    if (!shopsByOwner.has(ownerKey)) shopsByOwner.set(ownerKey, [])
+    shopsByOwner.get(ownerKey)!.push(shop)
+  })
+
+  return (
+    <div className="space-y-6">
+      {Array.from(shopsByOwner.entries()).map(([ownerId, ownerShops]) => {
+        const ownerName = ownerId === 'no-owner' ? 'ไม่มีเจ้าของ' : personName(ownerId)
+        return (
+          <div key={ownerId} className="space-y-4">
+            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              เจ้าของ: {ownerName} ({ownerShops.length} ร้าน)
+            </h2>
+            {ownerShops.map((shop) => (
+              <ShopCard
+                key={shop.id}
+                shop={shop}
+                snapshot={snapshot}
+                personName={personName}
+                onEdit={onEdit}
+                onRemove={onRemove}
+                onAddEmp={onAddEmp}
+                onEditEmployee={onEditEmployee}
+                isOwnerShop={false}
+              />
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ShopCard({
+  shop,
+  snapshot,
+  personName,
+  onEdit,
+  onRemove,
+  onAddEmp,
+  onEditEmployee,
+  isOwnerShop,
+}: {
+  shop: Shop
+  snapshot: any
+  personName: (id?: string | null) => string
+  onEdit: (shop: Shop) => void
+  onRemove: (shop: Shop) => void
+  onAddEmp: (shopId: string) => void
+  onEditEmployee: (emp: Employee, shopId: string) => void
+  isOwnerShop: boolean
+}) {
+  const staff = snapshot.employees.filter((e: Employee) => e.shopId === shop.id)
+  const visible = isOwnerShop ? staff.filter((e: Employee) => e.status !== 'deleted') : staff
+
+  return (
+    <div className={`${cardClass} overflow-hidden`}>
+      <div className="flex items-center gap-3 p-4">
+        <Thumb imageRef={shop.imageRef} alt={shop.name} className="h-14 w-14 shrink-0 rounded-xl" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="truncate font-semibold">{shop.name}</p>
+            {shop.ownerId && (
+              <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-900/40 dark:text-brand-400">
+                เจ้าของ: {personName(shop.ownerId)}
+              </span>
+            )}
+            {shop.adminId && shop.adminId !== shop.ownerId && (
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-600 dark:bg-sky-900/40 dark:text-sky-400">
+                แอดมิน: {personName(shop.adminId)}
+              </span>
+            )}
+          </div>
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{shop.phone || 'ไม่มีเบอร์'}</p>
+        </div>
+        <button className={`${btnGhost} px-3 py-2 text-xs`} onClick={() => onEdit(shop)}>
+          แก้ไข
+        </button>
+        <button className={`${btnDanger} px-3 py-2 text-xs`} onClick={() => onRemove(shop)}>
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            พนักงาน {visible.length} คน
+          </p>
+          <button className={`${btnGhost} px-3 py-1.5 text-xs`} onClick={() => onAddEmp(shop.id)}>
+            <UserPlusIcon className="h-3.5 w-3.5" /> เพิ่มพนักงาน
+          </button>
+        </div>
+        <div className="space-y-2">
+          {visible.length === 0 ? (
+            <p className="text-xs text-slate-400">ไม่มีพนักงาน</p>
+          ) : (
+            visible.map((e: Employee) => (
+              <div
+                key={e.id}
+                className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {e.avatarRef ? (
+                    <Thumb
+                      imageRef={e.avatarRef}
+                      alt={e.name}
+                      className="h-9 w-9 shrink-0 rounded-full"
+                    />
+                  ) : (
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">
+                      {e.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{e.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">{e.email}</p>
+                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {ROLE_LABEL[e.role] ?? e.role}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {e.status === 'deleted' ? (
+                    <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] text-red-500 dark:bg-red-950/40 dark:text-red-400">
+                      ถูกลบโดยเจ้าของ
+                    </span>
+                  ) : (
+                    <button
+                      className="grid h-8 w-8 place-items-center rounded-lg text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                      onClick={() => onEditEmployee(e, shop.id)}
+                      title="แก้ไขพนักงาน"
+                    >
+                      <UserIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      <ShopSalesSection shopId={shop.id} />
+    </div>
   )
 }

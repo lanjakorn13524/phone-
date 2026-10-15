@@ -11,6 +11,7 @@ export interface Shop {
   phone: string
   summaryDay?: number
   ownerId?: string
+  adminId?: string
 }
 
 export interface Employee {
@@ -113,6 +114,7 @@ export interface Backend {
   upsertEmployee(employee: Employee): Promise<void>
   deleteEmployee(id: string): Promise<void>
   upsertAccount(account: GlobalAccount): Promise<void>
+  deleteAccount(id: string): Promise<void>
   seed(snapshot: Snapshot): Promise<void>
 }
 

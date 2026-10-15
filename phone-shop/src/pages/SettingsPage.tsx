@@ -17,10 +17,11 @@ import { useTheme } from '../lib/theme'
 import type { Snapshot } from '../lib/types'
 
 export function SettingsPage() {
-  const { isStaff, isOwner } = useAuth()
+  const { isStaff, isOwner, isAdmin } = useAuth()
   if (isStaff) return <StaffSettings />
   if (isOwner) return <OwnerSettings />
-  return <AdminSettings />
+  if (isAdmin) return <AdminSettings />
+  return <OwnerSettings />
 }
 
 function ThemeCard() {
@@ -188,7 +189,7 @@ function OwnerSettings() {
         </div>
         <div>
           <p className="text-sm font-semibold">{session?.name}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">เจ้าของ · จัดการได้ทุกอย่าง</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">เจ้าของ · จัดการร้านของตัวเอง</p>
         </div>
       </div>
       <div className={`${cardClass} space-y-2 p-4`}>
