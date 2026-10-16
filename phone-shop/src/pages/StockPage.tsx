@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { DeviceDetailModal } from '../components/DeviceDetailModal'
 import { SellModal } from '../components/SellModal'
 import { BoxIcon, PencilIcon, SearchIcon, TrashIcon } from '../components/icons'
-import { btnDanger, btnGhost, btnPrimary, cardClass, inputClass } from '../components/ui'
+import { btnGhost, btnPrimary, cardClass, inputClass } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { useBackend } from '../lib/backend'
 import { baht } from '../lib/format'
@@ -172,9 +172,23 @@ export function StockPage() {
               ) : null}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {group.devices.map((d) => (
-                  <div key={d.id} className={`${cardClass} overflow-hidden`}>
+                  <div key={d.id} className={`${cardClass} relative overflow-hidden`}>
+                    {isAdmin || isOwner ? (
+                      <button
+                        type="button"
+                        aria-label="ลบเครื่อง"
+                        title="ลบเครื่อง"
+                        className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border border-red-200 bg-white text-red-500 shadow-sm transition hover:bg-red-50 dark:border-red-500/40 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/40"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteDevice(d)
+                        }}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    ) : null}
                     <div className="cursor-pointer" onClick={() => openDetail(d)}>
-                      <div className="space-y-2 px-3 pt-3">
+                      <div className={`space-y-2 px-3 pt-3 ${isAdmin || isOwner ? 'pr-11' : ''}`}>
                         <div>
                           <p className="truncate text-sm font-semibold">{d.model}</p>
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -216,12 +230,6 @@ export function StockPage() {
                           </button>
                           <button className={`${btnGhost} flex-1 py-2 text-xs`} onClick={() => setDetail({ device: d, readOnly: false })}>
                             <PencilIcon className="h-3.5 w-3.5" /> แก้ไข
-                          </button>
-                          <button
-                            className={`${btnDanger} flex-1 py-2 text-xs`}
-                            onClick={() => handleDeleteDevice(d)}
-                          >
-                            <TrashIcon className="h-3.5 w-3.5" /> ลบ
                           </button>
                         </div>
                       ) : (
