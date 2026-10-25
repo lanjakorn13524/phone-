@@ -19,13 +19,19 @@ export function StockPage() {
   const [detail, setDetail] = useState<{ device: Device; readOnly: boolean } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  // ร้านทั้งหมดที่เป็นของเจ้าของที่ล็อกอินอยู่ (รวมสต็อกทุกสาขาเข้าด้วยกัน)
-  const ownerShopIds = useMemo(
-    () => (isOwner ? snapshot.shops.filter((s) => s.ownerId === session?.id).map((s) => s.id) : []),
-    [snapshot.shops, isOwner, session?.id],
-  )
-
   const shopById = useMemo(() => new Map(snapshot.shops.map((s) => [s.id, s])), [snapshot.shops])
+
+  // Owner and staff can see stock across every branch with the same owner.
+  const visibleShopIds = useMemo(() => {
+    if (isOwner) {
+      return snapshot.shops.filter((shop) => shop.ownerId === session?.id).map((shop) => shop.id)
+    }
+    if (isStaff && activeShop) {
+      if (!activeShop.ownerId) return [activeShop.id]
+      return snapshot.shops.filter((shop) => shop.ownerId === activeShop.ownerId).map((shop) => shop.id)
+    }
+    return []
+  }, [snapshot.shops, isOwner, isStaff, session?.id, activeShop])
 
   function ownerIdOfShop(shopId: string): string {
     return shopById.get(shopId)?.ownerId ?? NO_OWNER
@@ -43,10 +49,8 @@ export function StockPage() {
     const q = query.trim().toLowerCase()
     let filtered = snapshot.devices
 
-    if (isOwner) {
-      filtered = filtered.filter((d) => ownerShopIds.includes(d.shopId))
-    } else if (isStaff) {
-      filtered = filtered.filter((d) => d.shopId === activeShop?.id)
+    if (isOwner || isStaff) {
+      filtered = filtered.filter((d) => visibleShopIds.includes(d.shopId))
     } else if (ownerFilter) {
       filtered = filtered.filter((d) => ownerIdOfShop(d.shopId) === ownerFilter)
     }
@@ -56,12 +60,12 @@ export function StockPage() {
         q ? [d.model, d.imei, d.color, d.memory].some((v) => v.toLowerCase().includes(q)) : true,
       )
       .sort((a, b) => b.createdAt - a.createdAt)
-  }, [snapshot.devices, isStaff, isOwner, activeShop?.id, ownerFilter, query, ownerShopIds, shopById])
+  }, [snapshot.devices, isStaff, isOwner, ownerFilter, query, visibleShopIds, shopById])
 
   // จัดกลุ่มสต็อกตามเจ้าของ (แอดมิน) — เจ้าของเห็นรวมทุกสาขาของตัวเองเป็นกลุ่มเดียว
   const groups = useMemo(() => {
     if (isStaff) {
-      return [{ key: 'shop', label: 'สต็อกร้าน', devices }]
+      return [{ key: 'shop', label: 'สต็อกรวมของเจ้าของเดียวกัน', devices }]
     }
     if (isOwner) {
       const names = new Set(devices.map((d) => shopById.get(d.shopId)?.name).filter(Boolean))
@@ -108,7 +112,9 @@ export function StockPage() {
           <h1 className="text-lg font-bold">สต็อกทั้งหมด</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {devices.length} เครื่อง · มูลค่ารวม {baht(totalValue)}
-            {isStaff ? '' : isOwner ? ' · รวมทุกสาขาของฉัน' : ' · จัดกลุ่มตามเจ้าของ'}
+            {isStaff
+              ? visibleShopIds.length > 1 ? ' · รวมทุกสาขาของเจ้าของเดียวกัน' : ''
+              : isOwner ? ' · รวมทุกสาขาของฉัน' : ' · จัดกลุ่มตามเจ้าของ'}
           </p>
         </div>
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
@@ -162,7 +168,7 @@ export function StockPage() {
         <div className="space-y-6">
           {groups.map((group) => (
             <div key={group.key} className="space-y-3">
-              {!isStaff ? (
+              {!isStaff || visibleShopIds.length > 1 ? (
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">{group.label}</h2>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
