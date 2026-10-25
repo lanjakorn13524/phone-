@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { DeviceDetailModal } from '../components/DeviceDetailModal'
 import { SellModal } from '../components/SellModal'
-import { BoxIcon, PencilIcon, SearchIcon, TrashIcon } from '../components/icons'
+import { BoxIcon, PencilIcon, SearchIcon, StoreIcon, TrashIcon } from '../components/icons'
 import { btnGhost, btnPrimary, cardClass, inputClass } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { useBackend } from '../lib/backend'
@@ -122,6 +122,22 @@ export function StockPage() {
         </div>
       </div>
 
+      {isStaff && activeShop ? (
+        <div className={`${cardClass} flex items-center gap-3 px-4 py-3`}>
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+            <StoreIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{activeShop.name}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {visibleShopIds.length > 1
+                ? `แสดงสต็อกทุกสาขาของเจ้าของเดียวกัน · ${visibleShopIds.length} สาขา`
+                : 'สต็อกของร้านนี้'}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -168,7 +184,7 @@ export function StockPage() {
         <div className="space-y-6">
           {groups.map((group) => (
             <div key={group.key} className="space-y-3">
-              {!isStaff || visibleShopIds.length > 1 ? (
+              {!isStaff || visibleShopIds.length > 0 ? (
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold">{group.label}</h2>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -256,9 +272,9 @@ export function StockPage() {
         <SellModal
           device={selling}
           onClose={() => setSelling(null)}
-          onSold={() => {
+          onSold={(warning) => {
             setSelling(null)
-            setToast(`ขาย ${selling.model} แล้ว และลบรูปเครื่องออกแล้ว`)
+            setToast(warning ?? `ขาย ${selling.model} แล้ว`)
             window.setTimeout(() => setToast(null), 3000)
           }}
         />

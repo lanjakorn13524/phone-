@@ -74,6 +74,12 @@ export function createFirestoreBackend(): Backend {
     async upsertDevice(device) {
       await setDoc(doc(db, 'devices', device.id), { ...device, id: device.id })
     },
+    async completeSale(sale, deviceId) {
+      const batch = writeBatch(db)
+      batch.set(doc(db, 'sales', sale.id), { ...sale, id: sale.id })
+      batch.delete(doc(db, 'devices', deviceId))
+      await batch.commit()
+    },
     async deleteDevice(id) {
       await deleteDoc(doc(db, 'devices', id))
     },

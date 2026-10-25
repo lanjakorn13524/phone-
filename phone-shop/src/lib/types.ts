@@ -106,6 +106,7 @@ export interface Backend {
   load(): Promise<Snapshot>
   subscribe(onData: (snapshot: Snapshot) => void, onError?: (error: unknown) => void): () => void
   upsertDevice(device: Device): Promise<void>
+  completeSale(sale: Sale, deviceId: string): Promise<void>
   deleteDevice(id: string): Promise<void>
   upsertSale(sale: Sale): Promise<void>
   deleteSale(id: string): Promise<void>

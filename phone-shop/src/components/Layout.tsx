@@ -156,7 +156,7 @@ export function Layout() {
           </div>
         </main>
 
-        <nav className="z-30 shrink-0 border-t border-slate-200 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
+        <nav className="z-30 shrink-0 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
           <div className="mx-auto flex max-w-5xl items-stretch justify-between px-2 py-1.5">
             {nav.map(({ to, label, Icon }) => (
               <NavLink

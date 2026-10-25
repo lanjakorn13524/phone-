@@ -92,6 +92,15 @@ function localBackend(): Backend {
       writeLocal({ ...s, devices: upsert(s.devices, device) })
       memory = readLocal()
     },
+    async completeSale(sale, deviceId) {
+      const s = current()
+      writeLocal({
+        ...s,
+        sales: upsert(s.sales, sale),
+        devices: s.devices.filter((d) => d.id !== deviceId),
+      })
+      memory = readLocal()
+    },
     async deleteDevice(id) {
       const s = current()
       writeLocal({ ...s, devices: s.devices.filter((d) => d.id !== id) })
@@ -191,9 +200,14 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     const startRealtime = () => {
       unsubscribe = backend.subscribe(
         (next) => {
-          if (alive) setSnapshot(normalize(next))
+          if (alive) {
+            setSnapshot(normalize(next))
+            setError(null)
+          }
         },
-        () => {},
+        (e: unknown) => {
+          if (alive) setError(e instanceof Error ? e.message : 'เชื่อมต่อข้อมูลเรียลไทม์ไม่สำเร็จ')
+        },
       )
     }
 
@@ -228,21 +242,35 @@ export function BackendProvider({ children }: { children: ReactNode }) {
 
   const addDevice = useCallback(
     async (device: Device) => {
-      await backend.upsertDevice(device)
       setSnapshot((s) => ({ ...s, devices: upsert(s.devices, device) }))
+      try {
+        await backend.upsertDevice(device)
+      } catch (error) {
+        setSnapshot((s) => ({ ...s, devices: s.devices.filter((d) => d.id !== device.id) }))
+        throw error
+      }
     },
     [backend],
   )
 
   const completeSale = useCallback(
     async (sale: Sale, deviceId: string) => {
-      await backend.upsertSale(sale)
-      await backend.deleteDevice(deviceId)
+      const device = snapRef.current.devices.find((d) => d.id === deviceId)
       setSnapshot((s) => ({
         ...s,
         sales: upsert(s.sales, sale),
         devices: s.devices.filter((d) => d.id !== deviceId),
       }))
+      try {
+        await backend.completeSale(sale, deviceId)
+      } catch (error) {
+        setSnapshot((s) => ({
+          ...s,
+          sales: s.sales.filter((item) => item.id !== sale.id),
+          devices: device ? upsert(s.devices, device) : s.devices,
+        }))
+        throw error
+      }
     },
     [backend],
   )

@@ -15,7 +15,7 @@ export function SellModal({
 }: {
   device: Device
   onClose: () => void
-  onSold: () => void
+  onSold: (warning?: string) => void
 }) {
   const { session } = useAuth()
   const { completeSale } = useBackend()
@@ -63,9 +63,14 @@ export function SellModal({
         soldById: session?.id,
         hadImages: device.images.device.length > 0 || Boolean(device.images.idCard),
       }
-      await images.removeMany([...device.images.device, device.images.idCard])
       await completeSale(sale, device.id)
-      onSold()
+      let warning: string | undefined
+      try {
+        await images.removeMany([...device.images.device, device.images.idCard])
+      } catch {
+        warning = 'ขายสำเร็จแล้ว แต่ลบรูปเครื่องไม่สำเร็จ'
+      }
+      onSold(warning)
     } catch {
       setError('บันทึกการขายไม่สำเร็จ ลองใหม่')
       setBusy(false)
