@@ -156,7 +156,7 @@ export function Layout() {
           </div>
         </main>
 
-        <nav className="relative z-30 mx-3 shrink-0 overflow-hidden rounded-full border border-white/60 bg-white/10 text-slate-800 shadow-[inset_0_1px_0px_rgba(255,255,255,0.75),0_0_9px_rgba(0,0,0,0.16),0_3px_8px_rgba(0,0,0,0.12)] backdrop-blur-2xl dark:border-white/40 dark:bg-slate-950/15 dark:text-white before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/30 before:via-transparent before:to-transparent before:opacity-70 after:pointer-events-none after:absolute after:inset-0 after:bg-gradient-to-tl after:from-white/15 after:via-transparent after:to-transparent after:opacity-50">
+        <nav className="relative z-30 mx-3 shrink-0 overflow-hidden rounded-t-[28px] border border-white/50 bg-white/5 text-slate-800 shadow-[inset_0_1px_0px_rgba(255,255,255,0.65),0_0_9px_rgba(0,0,0,0.12),0_3px_8px_rgba(0,0,0,0.08)] backdrop-blur-2xl dark:border-white/30 dark:bg-slate-950/10 dark:text-white before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/25 before:via-transparent before:to-transparent before:opacity-70 after:pointer-events-none after:absolute after:inset-0 after:bg-gradient-to-tl after:from-white/10 after:via-transparent after:to-transparent after:opacity-50">
           <div className="relative mx-auto flex max-w-5xl items-stretch justify-between px-2 py-1.5">
             {nav.map(({ to, label, Icon }) => (
               <NavLink
