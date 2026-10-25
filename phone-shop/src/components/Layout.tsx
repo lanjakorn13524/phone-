@@ -149,7 +149,7 @@ export function Layout() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 top-0 flex h-dvh flex-col md:hidden">
+      <div className="fixed inset-0 flex flex-col md:hidden">
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-5xl px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
             <Outlet />
