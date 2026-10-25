@@ -156,21 +156,21 @@ export function Layout() {
           </div>
         </main>
 
-        <nav className="z-30 shrink-0 border-t border-slate-200 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
-          <div className="mx-auto flex max-w-5xl items-stretch justify-between px-2 py-1.5">
+        <nav className="relative z-30 shrink-0 overflow-hidden rounded-t-xl border border-white/50 bg-slate-950/25 text-white shadow-[inset_0_1px_0px_rgba(255,255,255,0.75),0_0_9px_rgba(0,0,0,0.2),0_3px_8px_rgba(0,0,0,0.15)] backdrop-blur-xl before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/35 before:via-transparent before:to-transparent before:opacity-70 after:pointer-events-none after:absolute after:inset-0 after:bg-gradient-to-tl after:from-white/20 after:via-transparent after:to-transparent after:opacity-50">
+          <div className="relative mx-auto flex max-w-5xl items-stretch justify-between px-2 pt-1.5">
             {nav.map(({ to, label, Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition ${
+                  `relative flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[11px] font-medium transition-all duration-300 ${
                     isActive
-                      ? 'text-brand-600 dark:text-brand-400'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                      ? 'border-white/50 bg-white/25 text-white shadow-[inset_0_1px_0px_rgba(255,255,255,0.65),0_2px_6px_rgba(0,0,0,0.12)]'
+                      : 'border-transparent text-white/80 hover:border-white/30 hover:bg-white/15 hover:text-white'
                   }`
                 }
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5 drop-shadow-sm" />
                 {label}
               </NavLink>
             ))}
