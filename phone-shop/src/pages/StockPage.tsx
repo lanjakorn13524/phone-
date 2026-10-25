@@ -122,22 +122,6 @@ export function StockPage() {
         </div>
       </div>
 
-      {isStaff && activeShop ? (
-        <div className={`${cardClass} flex items-center gap-3 px-4 py-3`}>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-            <StoreIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{activeShop.name}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {visibleShopIds.length > 1
-                ? `แสดงสต็อกทุกสาขาของเจ้าของเดียวกัน · ${visibleShopIds.length} สาขา`
-                : 'สต็อกของร้านนี้'}
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -216,8 +200,9 @@ export function StockPage() {
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                             {d.color} · {d.memory}
                           </p>
-                          {!isStaff ? (
-                            <p className="truncate text-[11px] text-brand-600 dark:text-brand-400">
+                          {!isStaff || visibleShopIds.length > 0 ? (
+                            <p className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                              <StoreIcon className="h-3 w-3 shrink-0" />
                               {shopName(d.shopId)}
                             </p>
                           ) : null}
