@@ -266,7 +266,12 @@ export function StockPage() {
       ) : null}
 
       {detail ? (
-        <DeviceDetailModal device={detail.device} readOnly={detail.readOnly} onClose={() => setDetail(null)} />
+        <DeviceDetailModal
+          device={detail.device}
+          readOnly={detail.readOnly}
+          canChangeShop={isAdmin}
+          onClose={() => setDetail(null)}
+        />
       ) : null}
 
       {toast ? (

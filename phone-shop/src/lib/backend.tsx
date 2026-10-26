@@ -242,11 +242,17 @@ export function BackendProvider({ children }: { children: ReactNode }) {
 
   const addDevice = useCallback(
     async (device: Device) => {
+      const previous = snapRef.current.devices.find((item) => item.id === device.id)
       setSnapshot((s) => ({ ...s, devices: upsert(s.devices, device) }))
       try {
         await backend.upsertDevice(device)
       } catch (error) {
-        setSnapshot((s) => ({ ...s, devices: s.devices.filter((d) => d.id !== device.id) }))
+        setSnapshot((s) => ({
+          ...s,
+          devices: previous
+            ? upsert(s.devices, previous)
+            : s.devices.filter((item) => item.id !== device.id),
+        }))
         throw error
       }
     },

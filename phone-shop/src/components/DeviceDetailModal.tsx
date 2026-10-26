@@ -30,16 +30,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export function DeviceDetailModal({
   device,
   readOnly,
+  canChangeShop,
   onClose,
 }: {
   device: Device
   readOnly: boolean
+  canChangeShop: boolean
   onClose: () => void
 }) {
   const { snapshot, addDevice } = useBackend()
 
   const shop = snapshot.shops.find((s) => s.id === device.shopId)
 
+  const [shopId, setShopId] = useState(device.shopId)
   const [model, setModel] = useState(device.model)
   const [color, setColor] = useState(device.color)
   const [imei, setImei] = useState(device.imei)
@@ -49,11 +52,18 @@ export function DeviceDetailModal({
   const [costPrice, setCostPrice] = useState(String(device.costPrice))
   const [sellPrice, setSellPrice] = useState(String(device.sellPrice))
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function save() {
+    setError(null)
+    if (canChangeShop && !snapshot.shops.some((item) => item.id === shopId)) {
+      setError('กรุณาเลือกร้านที่มีอยู่')
+      return
+    }
     setBusy(true)
     const updated: Device = {
       ...device,
+      shopId: canChangeShop ? shopId : device.shopId,
       model: model.trim(),
       color: color.trim(),
       imei: imei.trim(),
@@ -63,9 +73,14 @@ export function DeviceDetailModal({
       costPrice: Number(costPrice) || 0,
       sellPrice: Number(sellPrice) || 0,
     }
-    await addDevice(updated)
-    setBusy(false)
-    onClose()
+    try {
+      await addDevice(updated)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -92,7 +107,27 @@ export function DeviceDetailModal({
       }
     >
       <div className="space-y-4">
-        {shop ? (
+        {canChangeShop && !readOnly ? (
+          <div>
+            <label className={labelClass} htmlFor="device-shop">ร้านที่แสดงบนเครื่อง</label>
+            <select
+              id="device-shop"
+              className={inputClass}
+              value={shopId}
+              onChange={(e) => setShopId(e.target.value)}
+              disabled={busy}
+            >
+              {!snapshot.shops.some((item) => item.id === device.shopId) ? (
+                <option value={device.shopId}>ร้านเดิม (ไม่พบข้อมูลร้าน)</option>
+              ) : null}
+              {[...snapshot.shops]
+                .sort((a, b) => a.name.localeCompare(b.name, 'th'))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+            </select>
+          </div>
+        ) : shop ? (
           <p className="text-xs text-slate-500 dark:text-slate-400">ร้าน: {shop.name}</p>
         ) : null}
 
@@ -163,6 +198,8 @@ export function DeviceDetailModal({
             </span>
           </div>
         ) : null}
+
+        {error ? <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       </div>
     </Modal>
   )
