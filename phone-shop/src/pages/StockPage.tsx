@@ -269,7 +269,12 @@ export function StockPage() {
         <DeviceDetailModal
           device={detail.device}
           readOnly={detail.readOnly}
-          canChangeShop={isAdmin}
+          canChangeShop={isAdmin || isOwner}
+          shopOptions={
+            isAdmin
+              ? snapshot.shops
+              : snapshot.shops.filter((shop) => shop.ownerId === session?.id)
+          }
           onClose={() => setDetail(null)}
         />
       ) : null}

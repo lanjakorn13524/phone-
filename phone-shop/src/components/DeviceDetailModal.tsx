@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { btnGhost, btnPrimary, inputClass, labelClass, Modal } from './ui'
 import { useBackend } from '../lib/backend'
 import { baht } from '../lib/format'
-import type { Device } from '../lib/types'
+import type { Device, Shop } from '../lib/types'
 
 const CHECK_LABELS: Record<string, string> = {
   model: 'โมเดล / ภูมิภาค',
@@ -31,11 +31,13 @@ export function DeviceDetailModal({
   device,
   readOnly,
   canChangeShop,
+  shopOptions,
   onClose,
 }: {
   device: Device
   readOnly: boolean
   canChangeShop: boolean
+  shopOptions: Shop[]
   onClose: () => void
 }) {
   const { snapshot, addDevice } = useBackend()
@@ -56,7 +58,7 @@ export function DeviceDetailModal({
 
   async function save() {
     setError(null)
-    if (canChangeShop && !snapshot.shops.some((item) => item.id === shopId)) {
+    if (canChangeShop && shopId !== device.shopId && !shopOptions.some((item) => item.id === shopId)) {
       setError('กรุณาเลือกร้านที่มีอยู่')
       return
     }
@@ -117,10 +119,10 @@ export function DeviceDetailModal({
               onChange={(e) => setShopId(e.target.value)}
               disabled={busy}
             >
-              {!snapshot.shops.some((item) => item.id === device.shopId) ? (
+              {!shopOptions.some((item) => item.id === device.shopId) ? (
                 <option value={device.shopId}>ร้านเดิม (ไม่พบข้อมูลร้าน)</option>
               ) : null}
-              {[...snapshot.shops]
+              {[...shopOptions]
                 .sort((a, b) => a.name.localeCompare(b.name, 'th'))
                 .map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
